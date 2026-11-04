@@ -3,6 +3,7 @@ import {products} from './catalogo-admin.js';
 
 const el = id => document.getElementById(id);
 const money = n => new Intl.NumberFormat('es-CO', {style: 'currency', currency: 'COP', maximumFractionDigits: 0}).format(n);
+let currentId = null, savedRows = [];
 let client, administrator = false, loading = false, writing = false;
 const config = window.RADI_CONFIG;
 function notify(message, error = false) {
@@ -43,24 +44,37 @@ function defaults() {
   el('active').checked = false;
   preview();
 }
+function fillPromotion(row) {
+  currentId = row ? row.id : null;
+  el('saved-promotions').value = row ? String(row.id) : '';
+  if (!row) { defaults(); return; }
+  const index = products.findIndex(p => p.name === row.product_name);
+  if (index < 0) { notify('Este servicio ya no está en el catálogo. Selecciona uno antes de guardar.', true); return; }
+  el('product').value = String(index);
+  el('name').value = row.name;
+  el('price').value = row.price;
+  el('ends').value = colombianInput(row.ends_at);
+  el('active').checked = row.active;
+  preview();
+}
 async function load() {
   if (!administrator || writing) return;
   el('reload').disabled = true;
   try {
-    const {data, error} = await client.from('radi_promotion').select('*').eq('id', 1).maybeSingle();
+    const {data, error} = await client.from('radi_promotion').select('*').order('id');
     if (error) throw error;
-    if (!data) { defaults(); return; }
-    const index = products.findIndex(p => p.name === data.product_name);
-    if (index < 0) throw new Error('catalogue_changed');
-    el('product').value = String(index);
-    el('name').value = data.name;
-    el('price').value = data.price;
-    el('ends').value = colombianInput(data.ends_at);
-    el('active').checked = data.active;
-    preview();
-  } catch (error) {
-    notify(error.message === 'catalogue_changed' ? 'El servicio guardado no está en este catálogo. Selecciona uno y revisa todos los datos antes de guardar.' : 'No se pudo cargar la promoción. Revisa la conexión y los permisos de tu usuario.', true);
-  } finally { el('reload').disabled = false; }
+    savedRows = data || [];
+    const picker = el('saved-promotions');
+    picker.replaceChildren();
+    const fresh = document.createElement('option'); fresh.value = ''; fresh.textContent = 'Nueva promoción'; picker.append(fresh);
+    for (const row of savedRows) {
+      const option = document.createElement('option'); option.value = String(row.id);
+      const state = !row.active ? 'Desactivada' : Date.parse(row.ends_at) <= Date.now() ? 'Finalizada' : 'Activa';
+      option.textContent = row.name + ' · ' + state; picker.append(option);
+    }
+    fillPromotion(savedRows.find(row => row.id === currentId) || null);
+  } catch (_) { notify('No se pudieron cargar las promociones. Revisa tu conexión y los permisos.', true); }
+  finally { el('reload').disabled = false; }
 }
 async function authorize() {
   if (loading) return;
@@ -99,7 +113,7 @@ if (!config || !/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/.test(config.supabaseUr
   el('logout').addEventListener('click', async () => {
     const {error} = await client.auth.signOut();
     if (error) { notify('No se pudo cerrar la sesión. Inténtalo de nuevo.', true); return; }
-    administrator = false; setView('login-section'); defaults(); notify('Sesión cerrada.');
+    administrator = false; currentId = null; savedRows = []; setView('login-section'); defaults(); notify('Sesión cerrada.');
   });
   el('promotion-form').addEventListener('submit', async event => {
     event.preventDefault(); if (!administrator || writing) return;
@@ -108,13 +122,19 @@ if (!config || !/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/.test(config.supabaseUr
     if (!name || name.length > 140 || !Number.isInteger(price) || price <= 0 || price >= product.price || !Number.isFinite(date.getTime()) || (active && date <= new Date())) {
       notify('Revisa el nombre, el precio (menor que el habitual) y la fecha futura de la promoción activa.', true); return;
     }
-    writing = true; el('save').disabled = true; el('reload').disabled = true;
+    if (active && savedRows.some(row => row.id !== currentId && row.product_name === product.name && row.active && Date.parse(row.ends_at) > Date.now())) { notify('Este servicio ya tiene una promoción activa. Selecciónala en Promociones guardadas para editarla o desactivarla.', true); return; }
+    writing = true; el('save').disabled = true; el('reload').disabled = true; el('new-promotion').disabled = true; el('saved-promotions').disabled = true;
     try {
-      const {error} = await client.from('radi_promotion').upsert({id: 1, product_name: product.name, name, regular_price: product.price, price, ends_at: date.toISOString(), active, updated_at: new Date().toISOString()}, {onConflict: 'id'}).select('id').single();
+      const payload = {product_name: product.name, name, regular_price: product.price, price, ends_at: date.toISOString(), active, updated_at: new Date().toISOString()};
+      const query = currentId === null ? client.from('radi_promotion').insert(payload) : client.from('radi_promotion').update(payload).eq('id', currentId);
+      const {data, error} = await query.select('id').single();
       if (error) throw error;
+      currentId = data.id;
+      writing = false;
+      await load();
       notify(active ? 'Promoción guardada. Aparecerá al abrir tu tienda o en su próxima actualización, dentro de un minuto.' : 'Promoción desactivada. Se ocultará al abrir tu tienda o en su próxima actualización, dentro de un minuto.');
     } catch (_) { notify('No se pudo guardar. Los cambios no se han publicado. Revisa tu conexión y los permisos.', true); }
-    finally { writing = false; el('save').disabled = false; el('reload').disabled = false; }
+    finally { writing = false; el('save').disabled = false; el('reload').disabled = false; el('new-promotion').disabled = false; el('saved-promotions').disabled = false; }
   });
   client.auth.onAuthStateChange(event => {
     if (event === 'SIGNED_OUT') { administrator = false; setView('login-section'); }
@@ -125,3 +145,6 @@ el('product').addEventListener('change', defaults);
 for (const id of ['name', 'price', 'ends', 'active']) el(id).addEventListener('input', preview);
 el('reload').addEventListener('click', load);
 setInterval(preview, 1000);
+
+el('new-promotion').addEventListener('click', () => { if (!writing) fillPromotion(null); });
+el('saved-promotions').addEventListener('change', () => { if (!writing) fillPromotion(savedRows.find(row => String(row.id) === el('saved-promotions').value) || null); });
