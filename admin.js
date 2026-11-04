@@ -21,7 +21,7 @@ function colombianInput(iso) {
 function preview() {
   const product = selected(); if (!product) return;
   const name = el('name').value.trim(), price = Number(el('price').value);
-  const date = new Date(el('ends').value + ':00-05:00');
+  const date = new Date(el('ends').value ? el('ends').value + ':00-05:00' : NaN);
   const validDate = Number.isFinite(date.getTime());
   const remaining = validDate ? Math.max(0, Math.floor((date - Date.now()) / 1000)) : 0;
   const active = el('active').checked;
@@ -104,7 +104,7 @@ if (!config || !/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/.test(config.supabaseUr
   el('promotion-form').addEventListener('submit', async event => {
     event.preventDefault(); if (!administrator || writing) return;
     const product = selected(), price = Number(el('price').value), name = el('name').value.trim();
-    const date = new Date(el('ends').value + ':00-05:00'), active = el('active').checked;
+    const date = new Date(el('ends').value ? el('ends').value + ':00-05:00' : NaN), active = el('active').checked;
     if (!name || name.length > 140 || !Number.isInteger(price) || price <= 0 || price >= product.price || !Number.isFinite(date.getTime()) || (active && date <= new Date())) {
       notify('Revisa el nombre, el precio (menor que el habitual) y la fecha futura de la promoción activa.', true); return;
     }
