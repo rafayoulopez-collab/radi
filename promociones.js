@@ -38,6 +38,9 @@
       restore(key);
       const badge=document.createElement('span');badge.className='radi-offer-label';badge.textContent='PROMOCIÓN';
       const was=document.createElement('div');was.className='radi-offer-was';const del=document.createElement('del');del.textContent=money(row.regular_price);was.append(del);
+      const percent=document.createElement('span');percent.className='radi-discount-percent';
+      const discount=Math.max(1,Math.min(99,Math.round((row.regular_price-row.price)/row.regular_price*100)));
+      percent.textContent='−'+discount+'%';percent.setAttribute('aria-label',discount+'% de descuento');was.append(percent);
       const timer=document.createElement('div');timer.className='radi-card-timer';timer.innerHTML='<small>Tiempo restante</small><b role="timer" aria-label="Tiempo restante de la promoción"></b><small class="radi-stock">O hasta agotar existencias</small>';
       applied.set(key,{card,price,buy,row,oldPrice:price.textContent,oldHref:buy.href,oldText:buy.textContent,badge,timer,was});
       card.classList.add('radi-offer');info.prepend(badge);price.parentNode.before(was);was.before(timer);
