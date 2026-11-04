@@ -1,5 +1,4 @@
-// Datos públicos del proyecto Supabase. No pongas contraseñas ni claves secretas.
 window.RADI_CONFIG = Object.freeze({
-  supabaseUrl: "",
-  publishableKey: ""
+  supabaseUrl: "https://lisrappejekryksikphh.supabase.co",
+  publishableKey: "sb_publishable_GxItYNw_eum7mHOYjx1JiA_7dhgLl1b"
 });
