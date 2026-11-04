@@ -35,7 +35,7 @@
     timer.innerHTML='<small>Tiempo restante</small><b role="timer" aria-label="Tiempo restante de la promoción"></b><small class="radi-stock">O hasta agotar existencias</small>';
     applied={card,price,buy,row,oldPrice:price.textContent,oldHref:buy.href,oldText:buy.textContent,oldId:card.id,badge,timer,was};
     card.id='radi-servicio-en-oferta';card.classList.add('radi-offer');
-    info.prepend(badge);price.parentNode.before(was);buy.before(timer);
+    info.prepend(badge);price.parentNode.before(was);was.before(timer);
     price.textContent=money(row.price);
     buy.href='https://wa.me/573127220795?text='+encodeURIComponent('Hola, quiero la promoción '+row.name+' ('+row.product_name+') por '+money(row.price)+' COP. ¿Está disponible?');
     notice.hidden=false;tick();
